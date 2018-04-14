@@ -37,6 +37,9 @@ int areValid(int argc, char **argv);
 void startWork();
 int runTasks();
 void prepareSharedMemory();
+void endWork();
+void P(int semaphore);
+void V(int semaphore);
 
 // MAIN FUNCTION
 int main(int argc, char **argv)
@@ -87,6 +90,7 @@ void startWork()
   semctl(semId, queueEntry, SETVAL, 0);
 
 }
+
 void prepareSharedMemory()
 {
   int shmId;
@@ -104,6 +108,7 @@ void prepareSharedMemory()
   freeServiceTrack = (int *)shmat(shmId, NULL, 0);
 
 }
+
 int runTasks()
 {
   int pid;
@@ -125,6 +130,37 @@ int runTasks()
     }
   }
 }
+
+void endWork()
+{
+    int processes;
+    for(processes = N; processes > 0; --processes) // one pass
+    {
+      wait(NULL);
+    }
+
+    semctl(semId, 0, IPC_RMID);
+
+    shmctl(inService, IPC_RMID, NULL);
+    shmctl(readyToEntry, IPC_RMID, NULL);
+    shmctl(readyToEscape, IPC_RMID, NULL);
+    shmctl(freeServiceTrack, IPC_RMID, NULL);
+}
+
+void P(int semaphore)
+{
+  semOpArg.sem_num = semaphore;
+  semOpArg.sem_op = -1;
+  semop(semId, &semOpArg, 1);
+}
+
+void V(int semaphore)
+{
+  semOpArg.sem_num = semaphore;
+  semOpArg.sem_op = 1;
+  semop(semId, &semOpArg, 1);
+}
+
 int areValid(int argc, char **argv)
 {
     if(argc!=5)
