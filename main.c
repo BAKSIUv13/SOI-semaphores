@@ -275,7 +275,7 @@ void bolid(int id)
     int refueling = 0;
     while (refueling++ < L) // every bolid is serviced L times
     {
-        drivingOnTheRoad(5, id);
+        drivingOnTheRoad(8, id);
 
         P(acces);
         if (*freeServiceTrack && (*inService < K))
@@ -290,15 +290,17 @@ void bolid(int id)
             P(queueEntry);
         }
 
-        entryToService(1, id);
+        entryToService(2, id);
 
 
         P(acces);
         ++*inService;
+        printf("inService: %d bolids\n", *inService);
         leaveServiceTrack();
         V(acces);
 
         serviceWorks(5, id);
+        printf("Finish service: %d\n", id);
 
         P(acces);
         if (*freeServiceTrack)
@@ -313,10 +315,11 @@ void bolid(int id)
             P(queueEscape); // ERROR 1 - V -> P
         }
 
-        exitService(1, id);
+        exitService(2, id);
 
         P(acces);
         --*inService;
+        printf("inService: %d bolids\n", *inService);
         leaveServiceTrack();
         V(acces);
     } // main while
