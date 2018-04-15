@@ -16,10 +16,10 @@
 // VARIABLES
 int N; // number of bolids
 int K; // number of services
-int P; // priority vaule
+int PRIORITY; // priority vaule
 int L; // number of visits in services
 
-       // shared memory below
+// shared memory below
 int *inService;
 int *readyToEntry;
 int *readyToEscape;
@@ -42,12 +42,12 @@ void endWork();
 void P(int semaphore);
 void V(int semaphore);
 
-void bolid();
+void bolid(int id);
 void leaveServiceTrack();
-void drivingOnTheRoad(unsigned int timeSec);
-void entryToService(unsigned int timeSec);
-void serviceWorks(unsigned int timeSec);
-void exitService(unsigned int timeSec);
+void drivingOnTheRoad(unsigned int timeSec, int id);
+void entryToService(unsigned int timeSec, int id);
+void serviceWorks(unsigned int timeSec, int id);
+void exitService(unsigned int timeSec, int id);
 
 // MAIN FUNCTION
 int main(int argc, char **argv)
@@ -71,26 +71,68 @@ int main(int argc, char **argv)
 void startWork()
 {
     int shmId;
+
     // MEMORY
     shmId = shmget(key, sizeof(int), 0600 | IPC_CREAT);
+    if (shmId < 0)
+    {
+        printf("startWork(): shmId < 0\n");
+        exit(0);
+    }
     inService = (int *)shmat(shmId, NULL, 0);
+    if (inService < 0)
+    {
+        printf("startWork(): inService < 0\n");
+        exit(0);
+    }
     *inService = 0;
     shmdt(inService);
 
     shmId = shmget(key + 1, sizeof(int), 0600 | IPC_CREAT);
+    if (shmId < 0)
+    {
+        printf("startWork(): shmId < 0\n");
+        exit(0);
+    }
     readyToEntry = (int *)shmat(shmId, NULL, 0);
+    if (readyToEntry < 0)
+    {
+        printf("startWork(): readyToEntry < 0\n");
+        exit(0);
+    }
     *readyToEntry = 0;
     shmdt(readyToEntry);
 
     shmId = shmget(key + 2, sizeof(int), 0600 | IPC_CREAT);
+    if (shmId < 0)
+    {
+        printf("startWork(): shmId < 0\n");
+        exit(0);
+    }
     readyToEscape = (int *)shmat(shmId, NULL, 0);
+    if (readyToEscape < 0)
+    {
+        printf("startWork(): readyToEscape < 0\n");
+        exit(0);
+    }
     *readyToEscape = 0;
     shmdt(readyToEscape);
 
     shmId = shmget(key + 3, sizeof(int), 0600 | IPC_CREAT);
+    if (shmId < 0)
+    {
+        printf("startWork(): shmId < 0\n");
+        exit(0);
+    }    
     freeServiceTrack = (int *)shmat(shmId, NULL, 0);
+    if (freeServiceTrack < 0)
+    {
+        printf("startWork(): freeServiceTrack < 0\n");
+        exit(0);
+    }
     *freeServiceTrack = TRUE;
     shmdt(freeServiceTrack);
+
     // SEMAPHORES
     semId = semget(key, 3, 0600 | IPC_CREAT);
     semctl(semId, acces, SETVAL, 1);
@@ -104,16 +146,56 @@ void prepareSharedMemory()
     int shmId;
 
     shmId = shmget(key, sizeof(int), 0600 | IPC_CREAT);
+    if (shmId < 0)
+    {
+        printf("prepareSharedMemory(): shmId < 0\n");
+        exit(0);
+    }    
     inService = (int *)shmat(shmId, NULL, 0);
+    if (inService < 0)
+    {
+        printf("prepareSharedMemory(): inService < 0\n");
+        exit(0);
+    }
 
     shmId = shmget(key + 1, sizeof(int), 0600 | IPC_CREAT);
+    if (shmId < 0)
+    {
+        printf("prepareSharedMemory(): shmId < 0\n");
+        exit(0);
+    }    
     readyToEntry = (int *)shmat(shmId, NULL, 0);
+    if (readyToEntry < 0)
+    {
+        printf("prepareSharedMemory(): readyToEntry < 0\n");
+        exit(0);
+    }
 
     shmId = shmget(key + 2, sizeof(int), 0600 | IPC_CREAT);
+    if (shmId < 0)
+    {
+        printf("prepareSharedMemory(): shmId < 0\n");
+        exit(0);
+    }    
     readyToEscape = (int *)shmat(shmId, NULL, 0);
+    if (readyToEscape < 0)
+    {
+        printf("prepareSharedMemory(): readyToEscape < 0\n");
+        exit(0);
+    }
 
     shmId = shmget(key + 3, sizeof(int), 0600 | IPC_CREAT);
+    if (shmId < 0)
+    {
+        printf("prepareSharedMemory(): shmId < 0\n");
+        exit(0);
+    }    
     freeServiceTrack = (int *)shmat(shmId, NULL, 0);
+    if (freeServiceTrack < 0)
+    {
+        printf("prepareSharedMemory(): freeServiceTrack < 0\n");
+        exit(0);
+    }
 
 }
 
@@ -124,19 +206,19 @@ int runTasks()
     for (i = 0; i < N; ++i)
     {
         pid = fork();
+        printf("fork!\n");
         if (pid == 0) // child
         {
             prepareSharedMemory();
             // go!
-            bolid();
+            printf("go: %d!\n", i);
+            bolid(i);
+            printf("finish: %d!\n", i);
             // finish!
             return 1;
         }
-        else
-        {
-            return 0;
-        }
     }
+    return 0;
 }
 
 void endWork()
@@ -177,9 +259,9 @@ int areValid(int argc, char **argv)
     }
     N = atoi(argv[1]);
     K = atoi(argv[2]);
-    P = atoi(argv[3]);
+    PRIORITY = atoi(argv[3]);
     L = atoi(argv[4]);
-    if (N <= 0 || K <= 0 || P <= 0 || L <= 0)
+    if (N <= 0 || K <= 0 || PRIORITY <= 0 || L <= 0)
     {
         return 0;
     }
@@ -188,17 +270,17 @@ int areValid(int argc, char **argv)
     return 1;
 }
 // BOLID ALGORITHM
-void bolid()
+void bolid(int id)
 {
     int refueling = 0;
     while (refueling++ < L) // every bolid is serviced L times
     {
-        drivingOnTheRoad(5);
+        drivingOnTheRoad(5, id);
 
         P(acces);
         if (*freeServiceTrack && (*inService < K))
         {
-            *freeServiceTrack = false;
+            *freeServiceTrack = FALSE;
             V(acces);
         }
         else
@@ -208,19 +290,20 @@ void bolid()
             P(queueEntry);
         }
 
-        entryToService(1);
+        entryToService(1, id);
+
 
         P(acces);
         ++*inService;
         leaveServiceTrack();
         V(acces);
 
-        serviceWorks(5);
+        serviceWorks(5, id);
 
         P(acces);
         if (*freeServiceTrack)
         {
-            *freeServiceTrack = false;
+            *freeServiceTrack = FALSE;
             V(acces);
         }
         else
@@ -230,7 +313,7 @@ void bolid()
             P(queueEscape); // ERROR 1 - V -> P
         }
 
-        exitService(1);
+        exitService(1, id);
 
         P(acces);
         --*inService;
@@ -243,7 +326,7 @@ void bolid()
 void leaveServiceTrack()
 {
 
-    if (*inService < P)
+    if (*inService < PRIORITY)
     {
         if (*readyToEntry > 0)
         {
@@ -257,7 +340,7 @@ void leaveServiceTrack()
         }
         else
         {
-            *freeServiceTrack = true;
+            *freeServiceTrack = TRUE;
         }
     }
     else
@@ -274,28 +357,32 @@ void leaveServiceTrack()
         }
         else
         {
-            *freeServiceTrack = true;
+            *freeServiceTrack = TRUE;
         }
     } // else
 
 } // zwolnij Pas serwisowy
 
-void drivingOnTheRoad(unsigned int timeSec)
+void drivingOnTheRoad(unsigned int timeSec, int id)
 {
+    printf("drivingOnTheRoad: %d\n", id);
     sleep(timeSec);
 }
 
-void entryToService(unsigned int timeSec)
+void entryToService(unsigned int timeSec, int id)
 {
+    printf("entryToService: %d\n", id);
     sleep(timeSec);
 }
 
-void serviceWorks(unsigned int timeSec)
+void serviceWorks(unsigned int timeSec, int id)
 {
+    printf("serviceWorks: %d\n", id);
     sleep(timeSec);
 }
 
-void exitService(unsigned int timeSec)
+void exitService(unsigned int timeSec, int id)
 {
+    printf("exitService: %d\n", id);
     sleep(timeSec);
 }
