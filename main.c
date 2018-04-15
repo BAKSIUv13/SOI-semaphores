@@ -1,6 +1,6 @@
 // Semaphores SOI
 // Bartlomiej Kulik
-// 14.04.2018
+// 15.04.2018
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +8,7 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <limits.h>
+#include <unistd.h>
 
 #define TRUE 1
 #define FALSE 0
@@ -28,7 +29,7 @@ int *freeServiceTrack;
 // semaphores
 int semId;
 struct sembuf semOpArg = { 0, 0, 0 };
-enum { acces, queueEntry, queueExit };
+enum { acces, queueEntry, queueEscape };
 // key to semaphores and shared memory
 key_t key;
 
@@ -40,6 +41,13 @@ void prepareSharedMemory();
 void endWork();
 void P(int semaphore);
 void V(int semaphore);
+
+void bolid();
+void leaveServiceTrack();
+void drivingOnTheRoad(unsigned int timeSec);
+void entryToService(unsigned int timeSec);
+void serviceWorks(unsigned int timeSec);
+void exitService(unsigned int timeSec);
 
 // MAIN FUNCTION
 int main(int argc, char **argv)
@@ -86,7 +94,7 @@ void startWork()
     // SEMAPHORES
     semId = semget(key, 3, 0600 | IPC_CREAT);
     semctl(semId, acces, SETVAL, 1);
-    semctl(semId, queueExit, SETVAL, 0);
+    semctl(semId, queueEscape, SETVAL, 0);
     semctl(semId, queueEntry, SETVAL, 0);
 
 }
@@ -178,4 +186,116 @@ int areValid(int argc, char **argv)
     // key set
     key_t key = ftok(argv[0], 1);
     return 1;
+}
+// BOLID ALGORITHM
+void bolid()
+{
+    int refueling = 0;
+    while (refueling++ < L) // every bolid is serviced L times
+    {
+        drivingOnTheRoad(5);
+
+        P(acces);
+        if (*freeServiceTrack && (*inService < K))
+        {
+            *freeServiceTrack = false;
+            V(acces);
+        }
+        else
+        {
+            ++*readyToEntry;
+            V(acces);
+            P(queueEntry);
+        }
+
+        entryToService(1);
+
+        P(acces);
+        ++*inService;
+        leaveServiceTrack();
+        V(acces);
+
+        serviceWorks(5);
+
+        P(acces);
+        if (*freeServiceTrack)
+        {
+            *freeServiceTrack = false;
+            V(acces);
+        }
+        else
+        {
+            ++*readyToEscape;
+            V(acces);
+            P(queueEscape); // ERROR 1 - V -> P
+        }
+
+        exitService(1);
+
+        P(acces);
+        --*inService;
+        leaveServiceTrack();
+        V(acces);
+    } // main while
+
+} // bolid
+
+void leaveServiceTrack()
+{
+
+    if (*inService < P)
+    {
+        if (*readyToEntry > 0)
+        {
+            --*readyToEntry;
+            V(queueEntry);
+        }
+        else if (*readyToEscape > 0)
+        {
+            --*readyToEscape;
+            V(queueEscape); // ERROR 2 - was queueEntry
+        }
+        else
+        {
+            *freeServiceTrack = true;
+        }
+    }
+    else
+    {
+        if (*readyToEscape > 0)
+        {
+            --*readyToEscape;
+            V(queueEscape); // ERROR 3
+        }
+        else if (*readyToEntry > 0)
+        {
+            --*readyToEntry;
+            V(queueEntry);
+        }
+        else
+        {
+            *freeServiceTrack = true;
+        }
+    } // else
+
+} // zwolnij Pas serwisowy
+
+void drivingOnTheRoad(unsigned int timeSec)
+{
+    sleep(timeSec);
+}
+
+void entryToService(unsigned int timeSec)
+{
+    sleep(timeSec);
+}
+
+void serviceWorks(unsigned int timeSec)
+{
+    sleep(timeSec);
+}
+
+void exitService(unsigned int timeSec)
+{
+    sleep(timeSec);
 }
